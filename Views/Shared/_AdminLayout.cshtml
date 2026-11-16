@@ -1,0 +1,115 @@
+@{
+    // Editorial surface. Authentication happens only on /adminLogin: this layout offers no Google
+    // sign-in and no sign-out control.
+    var isSignedIn = User.Identity?.IsAuthenticated == true && User.IsInRole("admin");
+    var displayName = User.Identity?.Name ?? "";
+    var initials = displayName.Length >= 2 ? displayName[..2].ToUpperInvariant() : displayName.ToUpperInvariant();
+    var notice = ViewData["Notice"] as string;
+    var error = ViewData["Error"] as string;
+    var title = ViewData["Title"] as string;
+    var loginPage = ViewData["IsAdminLogin"] as bool? == true;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="csrf-token" content="@(Context.Items["ApiCsrfToken"] as string)" />
+    <title>@(string.IsNullOrEmpty(title) ? "Editorial" : $"{title} · Folio editors")</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/pages.css" asp-append-version="true" />
+    @await RenderSectionAsync("Head", required: false)
+</head>
+<body class="@(loginPage ? "login-page" : "")" data-notice="@notice" data-error="@error" data-signed-in="@(isSignedIn ? "true" : "false")">
+    <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+    @if (!loginPage)
+    {
+        <header class="site-header@(isSignedIn ? " header-signed-in" : "")">
+            <div class="container header-inner">
+                <a class="brand" href="/admin" aria-label="Folio editorial dashboard">
+                    <span class="brand-mark" aria-hidden="true">✦</span>
+                    <span class="brand-text">
+                        <span class="brand-name">Folio</span>
+                        <span class="brand-sub">Press &amp; Bindery</span>
+                    </span>
+                </a>
+
+                <nav class="main-nav" aria-label="Primary">
+                    <a href="/#catalogue">Catalogue</a>
+                </nav>
+
+                @if (isSignedIn)
+                {
+                    <div class="header-actions">
+                        <div class="notification-wrap">
+                            <button type="button" class="bell-button" data-notifications-open aria-label="Notifications" aria-expanded="false" aria-controls="notification-panel">
+                                <span aria-hidden="true">🔔</span>
+                                <span class="bell-count" id="notification-count" hidden>0</span>
+                            </button>
+                            <div class="notification-panel" id="notification-panel" hidden>
+                                <header class="notification-head">
+                                    <strong>Notifications</strong>
+                                    <button type="button" class="btn btn-quiet btn-xs" id="notification-mark-read">Mark all read</button>
+                                </header>
+                                <div class="notification-list" id="notification-list">
+                                    <p class="notification-empty">Loading…</p>
+                                </div>
+                            </div>
+                        </div>
+                        <span class="avatar-button admin-chip" title="Signed in as @displayName">
+                            <span class="avatar avatar-sm">
+                                <span class="avatar-initials" aria-hidden="true">@initials</span>
+                            </span>
+                            <span class="avatar-name">@displayName</span>
+                        </span>
+                    </div>
+                }
+            </div>
+        </header>
+    }
+
+    <main>
+        @{
+            var flashSuccess = TempData["Success"] as string;
+            var flashWarning = TempData["Warning"] as string;
+            var flashFailure = TempData["Error"] as string;
+        }
+        @if (!string.IsNullOrWhiteSpace(flashSuccess) || !string.IsNullOrWhiteSpace(flashWarning) || !string.IsNullOrWhiteSpace(flashFailure))
+        {
+            <div class="container flash-region" role="status" aria-live="polite">
+                @if (!string.IsNullOrWhiteSpace(flashSuccess))
+                {
+                    <p class="flash flash-success"><span aria-hidden="true">✓</span> @flashSuccess</p>
+                }
+                @if (!string.IsNullOrWhiteSpace(flashWarning))
+                {
+                    <p class="flash flash-warning"><span aria-hidden="true">!</span> @flashWarning</p>
+                }
+                @if (!string.IsNullOrWhiteSpace(flashFailure))
+                {
+                    <p class="flash flash-error"><span aria-hidden="true">✕</span> @flashFailure</p>
+                }
+            </div>
+        }
+        @RenderBody()
+    </main>
+
+    @if (!loginPage)
+    {
+        <footer class="site-footer">
+            <div class="container footer-inner">
+                <div>
+                    <p class="footer-brand">Folio Press &amp; Bindery · Editorial</p>
+                    <p class="muted small">Restricted area. Every moderation decision is logged against your editor account.</p>
+                </div>
+                <span class="muted small">© @DateTime.UtcNow.Year Folio Press</span>
+            </div>
+        </footer>
+    }
+
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

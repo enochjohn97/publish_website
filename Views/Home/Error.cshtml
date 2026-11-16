@@ -1,0 +1,27 @@
+@{
+    ViewData["Title"] = "Something went wrong";
+    var status = ViewData["Status"] as int? ?? 500;
+    var notFound = status == 404;
+}
+
+<div class="container" style="min-height:60vh;display:grid;place-items:center;padding:64px 20px">
+    <div class="center" style="max-width:520px">
+        <p class="eyebrow">@(notFound ? "Nothing shelved here" : "An interruption at the press")</p>
+        <h1 class="section-title">@(notFound ? "We couldn't find that page" : "Something interrupted the press")</h1>
+        <p class="mt-3" style="color:rgba(75,81,88,.8)">
+            @if (notFound)
+            {
+                <text>The page or manuscript you asked for isn't available. It may still be in draft, or it may have been removed.</text>
+            }
+            else
+            {
+                <text>We hit an unexpected problem loading this page. Your data is safe — try again, or head back to the catalogue. Our team has the full error log.</text>
+            }
+        </p>
+        <div class="btn-group" style="justify-content:center;margin-top:24px">
+            <a href="/" class="btn btn-primary">Back to the catalogue</a>
+            <a href="javascript:history.back()" class="btn btn-ghost">Go back</a>
+        </div>
+        @* <p class="tiny muted mt-4">Reference: @status · @DateTime.UtcNow.ToString("u")</p> *@
+    </div>
+</div>

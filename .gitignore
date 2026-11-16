@@ -1,0 +1,9 @@
+bin/
+obj/
+.vs/
+.data/
+.cloud-attachments/
+.vscode/
+appsettings.Development.json
+*.user
+*.suo

@@ -1,0 +1,125 @@
+@model BookPageViewModel
+@{
+    ViewData["Title"] = Model.Book.Title;
+    var firstChapter = Model.Chapters.FirstOrDefault();
+    var statusLabel = Model.Book.Status == "completed" ? "Completed" : Model.Book.Status == "ongoing" ? "Ongoing" : "Draft";
+}
+
+<div class="container" style="padding-top:32px;padding-bottom:24px">
+    <a class="back-link" href="/#catalogue">← Back to catalogue</a>
+
+    <div class="detail-grid">
+        <div>
+            <div class="detail-cover">
+                @if (!string.IsNullOrWhiteSpace(Model.Book.CoverImageUrl))
+                {
+                    <img class="book-cover" src="@Model.Book.CoverImageUrl" alt="Cover of @Model.Book.Title" />
+                }
+                else
+                {
+                    <div class="cover-fallback">
+                        <span class="cover-press">Folio Press</span>
+                        <span class="cover-title">@Model.Book.Title</span>
+                        <span class="cover-author">@Model.Book.AuthorName</span>
+                    </div>
+                }
+            </div>
+            <dl class="detail-facts">
+                <div class="fact"><dt>Chapters</dt><dd>@Model.Book.ChapterCount</dd></div>
+                <div class="fact"><dt>Read time</dt><dd>@Model.Book.ReadingMinutes min</dd></div>
+            </dl>
+        </div>
+
+        <div>
+            <div class="row">
+                <span class="chip chip-forest">@Model.Book.Category</span>
+                <span class="chip">@statusLabel</span>
+                @if (Model.Book.Status == "draft")
+                {
+                    <span class="chip chip-burgundy">Unpublished draft</span>
+                }
+            </div>
+
+            <h1 class="detail-title">@Model.Book.Title</h1>
+            <p class="detail-byline">by <strong style="color:var(--ink)">@Model.Book.AuthorName</strong> · added @Model.Book.CreatedAt.ToString("MMM d, yyyy")</p>
+            <p class="detail-synopsis">@Model.Book.Synopsis</p>
+
+            <div class="detail-actions">
+                @if (firstChapter is not null)
+                {
+                    <a href="/books/@Model.Book.Slug/@firstChapter.ChapterNumber" class="btn btn-primary">Start reading</a>
+                }
+                else
+                {
+                    <span class="btn btn-ghost" aria-disabled="true">Chapters coming soon</span>
+                }
+            </div>
+
+            <section class="detail-section">
+                <h2>Contents</h2>
+                @if (Model.Chapters.Count == 0)
+                {
+                    <p class="empty-state" style="padding:20px;text-align:left">No chapters have been published for this title yet.</p>
+                }
+                else
+                {
+                    <ol class="chapter-list" style="list-style:none;margin:12px 0 0;padding:0">
+                        @foreach (var chapter in Model.Chapters)
+                        {
+                            <li>
+                                <a class="chapter-row" href="/books/@Model.Book.Slug/@chapter.ChapterNumber">
+                                    <span class="chapter-row-left">
+                                        <span class="chapter-index">@chapter.ChapterNumber.ToString("00")</span>
+                                        <span class="chapter-name">@chapter.Title</span>
+                                        @if (chapter.Status == "draft")
+                                        {
+                                            <span class="badge-soft badge-burgundy">Draft</span>
+                                        }
+                                    </span>
+                                    <span class="chapter-row-right">
+                                        @(chapter.PublishedAt.HasValue ? chapter.PublishedAt.Value.ToString("MMM d, yyyy") : "—")
+                                        <span aria-hidden="true">→</span>
+                                    </span>
+                                </a>
+                            </li>
+                        }
+                    </ol>
+                }
+            </section>
+
+            <section class="detail-section">
+                <h2>Credits</h2>
+                <div class="credits">
+                    <div class="credit">
+                        <span class="credit-avatar">✒</span>
+                        <div>
+                            <p class="credit-role">Author</p>
+                            <p style="font-family:var(--display);font-size:1.05rem">@Model.Book.AuthorName</p>
+                        </div>
+                    </div>
+                    @foreach (var contributor in Model.Contributors)
+                    {
+                        <div class="credit">
+                            @if (!string.IsNullOrWhiteSpace(contributor.AvatarUrl))
+                            {
+                                <img class="credit-avatar" src="@contributor.AvatarUrl" alt="" referrerpolicy="no-referrer" />
+                            }
+                            else
+                            {
+                                <span class="credit-avatar">✦</span>
+                            }
+                            <div style="min-width:0">
+                                <p style="font-size:0.85rem;font-weight:600;overflow:hidden;text-overflow:ellipsis">@contributor.Username</p>
+                                <p class="credit-role">@contributor.RoleLabel</p>
+                            </div>
+                        </div>
+                    }
+                </div>
+                @if (Model.Contributors.Count == 0)
+                {
+                    <p class="tiny muted mt-2">No reader contributions credited yet. Accepted marginalia can be promoted to this page.</p>
+                }
+            </section>
+        </div>
+    </div>
+</div>

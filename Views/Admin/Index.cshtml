@@ -1,0 +1,510 @@
+@model AdminViewModel
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Editorial dashboard";
+    var categories = new[] { "Fiction", "Literary Fiction", "Poetry", "Memoir", "Essay", "History", "Science", "Children", "Business", "Art & Design" };
+}
+
+<div class="container" style="padding-top:40px;padding-bottom:24px">
+    <div class="admin-head">
+        <div>
+            <h1>Good to see you, @Model.Admin.Username</h1>
+            <p>Publish manuscripts, add chapters and keep the margins civil. Every moderation decision is logged on the server.</p>
+        </div>
+        <div class="btn-group">
+            <a href="/" class="btn btn-ghost">View site</a>
+            <button type="button" class="btn btn-primary" id="open-upload">+ Upload book</button>
+        </div>
+    </div>
+
+    <div class="stat-grid">
+        <div class="card stat-card">
+            <p class="stat-label">Titles</p>
+            <p class="stat-value">@Model.Stats.Books</p>
+            <p class="tiny muted">@Model.Stats.PublishedBooks public</p>
+        </div>
+        <div class="card stat-card">
+            <p class="stat-label">Chapters</p>
+            <p class="stat-value">@Model.Stats.Chapters</p>
+            <p class="tiny muted">across all books</p>
+        </div>
+        <div class="card stat-card">
+            <p class="stat-label">Awaiting review</p>
+            <p class="stat-value">@Model.Stats.PendingComments</p>
+            <p class="tiny muted">moderation queue</p>
+        </div>
+        <div class="card stat-card">
+            <p class="stat-label">Contributors</p>
+            <p class="stat-value">@Model.Stats.Contributors</p>
+            <p class="tiny muted">@Model.Stats.Readers readers</p>
+        </div>
+    </div>
+
+    <div class="tabs" role="tablist">
+        <button type="button" class="tab" role="tab" id="tab-moderation" data-tab="moderation" aria-selected="true" aria-controls="panel-moderation">
+            Moderation queue <span class="count" id="pending-count">@Model.QueueCount</span>
+        </button>
+        <button type="button" class="tab" role="tab" id="tab-manuscripts" data-tab="manuscripts" aria-selected="false" aria-controls="panel-manuscripts">
+            Manuscripts <span class="count">@Model.Books.Count</span>
+        </button>
+    </div>
+
+    <div class="admin-panel admin-panel-moderation" id="panel-moderation" role="tabpanel" aria-labelledby="tab-moderation">
+        <div>
+            <h2 class="panel-title">Awaiting your decision</h2>
+            @if (Model.Pending.Count == 0)
+            {
+                <div class="empty-state" id="queue-empty">
+                    <p class="eyebrow">All clear</p>
+                    <h3>The queue is clear</h3>
+                    <p>New notes and contributions will appear here the moment a reader submits one.</p>
+                </div>
+            }
+            <ul class="queue" id="queue-list">
+                @foreach (var comment in Model.Pending)
+                {
+                    <li class="card queue-card" data-queue-id="@comment.Id" data-book-id="@comment.BookId" data-user-id="@comment.UserId" data-user-name="@comment.Username" data-contribution="@(comment.IsContributorSubmission ? "true" : "false")" data-book-title="@comment.BookTitle">
+                        <div class="queue-top">
+                            <div class="queue-person">
+                                @if (!string.IsNullOrWhiteSpace(comment.AvatarUrl))
+                                {
+                                    <img class="note-avatar" src="@comment.AvatarUrl" alt="" referrerpolicy="no-referrer" />
+                                }
+                                else
+                                {
+                                    <span class="note-avatar-fallback">@(comment.Username.Length >= 2 ? comment.Username[..2].ToUpperInvariant() : comment.Username)</span>
+                                }
+                                <div>
+                                    <strong>@comment.Username</strong>
+                                    <span class="note-time">@comment.CreatedAt.ToString("MMM d, yyyy · h:mm tt") UTC</span>
+                                </div>
+                            </div>
+                            <div class="row" style="gap:6px">
+                                @if (comment.Kind == "correction")
+                                {
+                                    <span class="badge-soft badge-gold">Correction</span>
+                                }
+                                @if (comment.PageNumber.HasValue)
+                                {
+                                    <span class="badge-soft badge-forest">Page @comment.PageNumber</span>
+                                }
+                                @if (comment.IsContributorSubmission)
+                                {
+                                    <span class="badge-soft badge-gold">Contribution</span>
+                                }
+                                @if (comment.IsSpoiler)
+                                {
+                                    <span class="badge-soft badge-burgundy">Spoiler</span>
+                                }
+                            </div>
+                        </div>
+                        <p class="queue-context">
+                            @comment.BookTitle · Ch. @comment.ChapterNumber — @comment.ChapterTitle
+                            @if (comment.Kind == "correction")
+                            {
+                                <span class="badge-soft badge-gold" style="margin-left:6px">Correction</span>
+                            }
+                            @if (comment.PageNumber.HasValue)
+                            {
+                                <a class="queue-link" target="_blank" rel="noopener"
+                                   href="/books/@comment.BookSlug/@comment.ChapterNumber#page-@comment.PageNumber">Open page @comment.PageNumber ↗</a>
+                            }
+                        </p>
+                        @if (!string.IsNullOrWhiteSpace(comment.HighlightedText))
+                        {
+                            <blockquote class="queue-quote">@comment.HighlightedText</blockquote>
+                        }
+                        <p class="queue-content">@comment.Content</p>
+                        <div class="queue-actions">
+                            <button type="button" class="btn btn-primary btn-xs" data-moderate="accept" data-comment-id="@comment.Id">✓ Accept</button>
+                            <button type="button" class="btn btn-ghost btn-xs btn-danger" data-moderate="reject" data-comment-id="@comment.Id">✕ Reject</button>
+                            <span class="note-time">@comment.CreatedAt.ToString("MMM d")</span>
+                        </div>
+                    </li>
+                }
+            </ul>
+        </div>
+
+        <aside>
+            <h2 class="panel-title">Recent decisions</h2>
+            @if (Model.Recent.Count == 0)
+            {
+                <p class="profile-empty mt-3">No decisions yet. Accepted and rejected notes appear here.</p>
+            }
+            <ul class="recent-list">
+                @foreach (var comment in Model.Recent)
+                {
+                    <li class="recent-item">
+                        <div class="recent-item-head">
+                            <strong>@comment.Username</strong>
+                            <span class="badge-soft @(comment.Status == "accepted" ? "badge-forest" : "badge-burgundy")">
+                                @(comment.Status == "accepted" ? "Published" : "Rejected")
+                            </span>
+                        </div>
+                        @if (comment.Kind == "correction" || comment.PageNumber.HasValue)
+                        {
+                            <p class="tiny muted" style="margin-top:2px">
+                                @(comment.Kind == "correction" ? "Correction" : "Note")
+                                @if (comment.PageNumber.HasValue)
+                                {
+                                    <text> · page @comment.PageNumber</text>
+                                }
+                            </p>
+                        }
+                        <p>@comment.Content</p>
+                        <span class="note-time">@comment.CreatedAt.ToString("MMM d, h:mm tt") UTC</span>
+                    </li>
+                }
+            </ul>
+        </aside>
+    </div>
+
+    <div class="admin-panel" id="panel-manuscripts" role="tabpanel" aria-labelledby="tab-manuscripts" hidden>
+        <div class="section-head" style="margin-bottom:0">
+            <h2 class="panel-title">Manuscripts</h2>
+            <input class="field filter-input" id="manuscript-filter" type="search" placeholder="Filter titles…" aria-label="Filter manuscripts" />
+        </div>
+
+        <div class="book-lookup">
+            <label class="label" for="book-lookup">Add pages or chapters to an existing book</label>
+            <input class="field" id="book-lookup" type="search" autocomplete="off" placeholder="Type a book name to find it…"
+                   aria-controls="book-lookup-results" aria-expanded="false" />
+            <div class="book-lookup-results" id="book-lookup-results" hidden></div>
+            <p class="hint">Every book you create is kept for reference — search its name, open its information and add more chapters or pages at any time.</p>
+        </div>
+
+        @if (Model.Books.Count == 0)
+        {
+            <div class="empty-state">
+                <p class="eyebrow">Empty press</p>
+                <h3>No titles yet</h3>
+                <p>Upload the first manuscript to open the catalogue. Nothing is pre-filled — every title here is real data you publish.</p>
+                <button type="button" class="btn btn-primary mt-4" id="open-upload-empty">Upload book</button>
+            </div>
+        }
+
+        <div id="manuscript-list">
+            @foreach (var book in Model.Books)
+            {
+                <div class="card manuscript" data-manuscript data-book-id="@book.Id" data-title="@book.Title" data-slug="@book.Slug" data-next-chapter="@(book.ChapterCount + 1)" data-status="@book.Status" data-category="@book.Category" data-author="@book.AuthorName" data-synopsis="@book.Synopsis" data-filter="@($"{book.Title} {book.AuthorName} {book.Category}".ToLowerInvariant())">
+                    <div class="manuscript-cover">
+                        @if (!string.IsNullOrWhiteSpace(book.CoverImageUrl))
+                        {
+                            <img class="book-cover" src="@book.CoverImageUrl" alt="" />
+                        }
+                        else
+                        {
+                            <div class="cover-fallback" style="padding:6px"><span class="cover-press">Folio</span></div>
+                        }
+                    </div>
+                    <div class="manuscript-main">
+                        <div class="manuscript-title">
+                            <h3>@book.Title</h3>
+                            <span class="chip">@book.Category</span>
+                            <span class="tiny muted">@book.ChapterCount ch.</span>
+                        </div>
+                        <p class="manuscript-meta">by @book.AuthorName · added @book.CreatedAt.ToString("MMM d, yyyy · h:mm tt") UTC</p>
+                        <p class="manuscript-synopsis">@book.Synopsis</p>
+                    </div>
+                    <div class="manuscript-actions">
+                        <select class="field" data-status-select aria-label="Publication status for @book.Title">
+                            <option value="draft" selected="@(book.Status == "draft")">Draft</option>
+                            <option value="ongoing" selected="@(book.Status == "ongoing")">Ongoing</option>
+                            <option value="completed" selected="@(book.Status == "completed")">Completed</option>
+                        </select>
+                      <button type="button" class="btn btn-ghost btn-xs" data-book-edit>Edit</button>
+                      <button type="button" class="btn btn-ghost btn-xs" data-add-chapter>+ Chapter</button>
+                      <a class="btn btn-quiet btn-xs" href="/books/@book.Slug" aria-label="Open @book.Title">↗</a>
+                      <button type="button" class="btn btn-quiet btn-xs btn-danger" data-delete-book aria-label="Delete @book.Title">🗑</button>
+                    
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="card" style="padding:18px;background:rgba(243,234,217,.4)">
+            <p style="font-size:.875rem;font-weight:600">Moderation tip</p>
+            <p class="small" style="color:rgba(75,81,88,.75);margin-top:4px">
+                Accepting a contribution opens a prompt to credit its author on the book. Credited readers appear on the public credits
+                page and keep the Contributor badge.
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Book information / edit -->
+<div class="modal" id="book-info-modal" hidden>
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-panel modal-lg" role="dialog" aria-modal="true" aria-labelledby="book-info-title">
+        <header class="modal-head">
+            <div>
+                <h2 id="book-info-title">Book information</h2>
+                <p class="muted small" id="book-info-sub">Edit the details, then add pages or chapters to this book.</p>
+            </div>
+            <button type="button" class="icon-button" data-modal-close aria-label="Close">✕</button>
+        </header>
+        <div class="modal-body">
+            <div class="form-error mb-4" id="book-info-error" hidden></div>
+            <input type="hidden" id="info-book-id" />
+            <div class="form-grid form-grid-2">
+                <div>
+                    <label class="label" for="info-title">Book name <span class="required">*</span></label>
+                    <input class="field" id="info-title" maxlength="255" />
+                    <p class="error-text" data-error-for="title" hidden></p>
+                </div>
+                <div>
+                    <label class="label" for="info-category">Category <span class="required">*</span></label>
+                    <select class="field" id="info-category">
+                        @foreach (var category in categories)
+                        {
+                            <option value="@category">@category</option>
+                        }
+                    </select>
+                    <p class="error-text" data-error-for="category" hidden></p>
+                </div>
+                <div>
+                    <label class="label" for="info-author">Author name <span class="required">*</span></label>
+                    <input class="field" id="info-author" maxlength="120" />
+                    <p class="error-text" data-error-for="authorName" hidden></p>
+                </div>
+                <div>
+                    <label class="label" for="info-status">Publication status</label>
+                    <select class="field" id="info-status">
+                        <option value="draft">Draft — hidden from readers</option>
+                        <option value="ongoing">Ongoing — serialising now</option>
+                        <option value="completed">Completed — full manuscript</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mt-3">
+                <label class="label" for="info-synopsis">Synopsis <span class="required">*</span></label>
+                <textarea class="field" id="info-synopsis" rows="4" maxlength="4000"></textarea>
+                <p class="error-text" data-error-for="synopsis" hidden></p>
+            </div>
+            <p class="hint mt-2" id="book-info-chapters"></p>
+        </div>
+        <footer class="modal-foot" style="flex-wrap:wrap;gap:8px">
+            <a class="btn btn-quiet btn-xs" id="info-open-book" href="#">Open book</a>
+            <button type="button" class="btn btn-ghost btn-xs" id="info-add-chapter">+ Add pages / chapters</button>
+            <button type="button" class="btn btn-primary" id="book-info-save">Save changes</button>
+        </footer>
+    </div>
+</div>
+
+<!-- Upload book -->
+<div class="modal" id="upload-modal" hidden>
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-panel modal-lg" role="dialog" aria-modal="true" aria-labelledby="upload-title">
+        <header class="modal-head">
+            <div>
+                <h2 id="upload-title">Publish a new title</h2>
+                <p class="muted small">All fields are required. Covers are validated for type, size and file signature.</p>
+            </div>
+            <button type="button" class="icon-button" data-modal-close aria-label="Close">✕</button>
+        </header>
+        <form id="upload-form" novalidate>
+            <div class="modal-body">
+                <div class="form-error mb-4" id="upload-error" hidden></div>
+                <div class="form-grid form-grid-2">
+                    <div>
+                        <label class="label" for="book-title">Book name <span class="required">*</span></label>
+                        <input class="field" id="book-title" name="title" maxlength="255" placeholder="The Salt Harvest" data-autofocus />
+                        <p class="error-text" data-error-for="title" hidden></p>
+                    </div>
+                    <div>
+                        <label class="label" for="book-category">Category <span class="required">*</span></label>
+                        <select class="field" id="book-category" name="category">
+                            <option value="">Select a category</option>
+                            @foreach (var category in categories)
+                            {
+                                <option value="@category">@category</option>
+                            }
+                        </select>
+                        <p class="error-text" data-error-for="category" hidden></p>
+                    </div>
+                    <div>
+                        <label class="label" for="book-author">Author name <span class="required">*</span></label>
+                        <input class="field" id="book-author" name="authorName" maxlength="120" placeholder="Amara Okonjo" />
+                        <p class="error-text" data-error-for="authorName" hidden></p>
+                    </div>
+                    <div>
+                        <span class="label">Creation date</span>
+                        <div class="field" style="display:flex;align-items:center;justify-content:space-between;background:rgba(243,234,217,.6)">
+                            <span>@DateTime.UtcNow.ToString("MMMM d, yyyy")</span>
+                            <span class="tiny muted">auto</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <span class="label">Cover image <span class="required">*</span></span>
+                    <div class="cover-row">
+                        <button type="button" class="cover-drop" id="cover-drop" aria-label="Choose a cover image">
+                            <span class="cover-drop-hint" id="cover-hint">JPG PNG WebP<br />≤ 4 MB</span>
+                        </button>
+                        <div style="min-width:0;flex:1">
+                            <p class="small">Uploads are re-checked on the server against their file signature before they are stored.</p>
+                            <div class="btn-group mt-2">
+                                <button type="button" class="btn btn-ghost btn-xs" id="choose-cover">Choose file</button>
+                                <button type="button" class="btn btn-quiet btn-xs" id="remove-cover" hidden>Remove</button>
+                            </div>
+                            <p class="hint" id="cover-name"></p>
+                        </div>
+                    </div>
+                    <input type="file" id="cover-input" accept="image/jpeg,image/png,image/webp" hidden />
+                    <p class="error-text" data-error-for="cover" hidden></p>
+                </div>
+
+                <div class="mt-4">
+                    <label class="label" for="book-synopsis">Synopsis <span class="required">*</span></label>
+                    <textarea class="field" id="book-synopsis" name="synopsis" rows="4" maxlength="4000" placeholder="What is this book about? This appears on the catalogue card and the book page."></textarea>
+                    <div class="row" style="justify-content:space-between">
+                        <p class="error-text" data-error-for="synopsis" hidden></p>
+                        <span class="hint" id="synopsis-count">0/4000</span>
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <label class="label" for="book-status">Publication status</label>
+                    <select class="field" id="book-status" name="status">
+                        <option value="ongoing">Ongoing — serialising now</option>
+                        <option value="completed">Completed — full manuscript</option>
+                        <option value="draft">Draft — hidden from readers</option>
+                    </select>
+                </div>
+            </div>
+            <footer class="modal-foot">
+                <button type="button" class="btn btn-quiet" data-modal-close>Cancel</button>
+                <button type="submit" class="btn btn-primary" id="upload-submit">Publish book</button>
+            </footer>
+        </form>
+    </div>
+</div>
+
+<!-- Add chapter -->
+<div class="modal" id="chapter-modal" hidden>
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-panel modal-lg" role="dialog" aria-modal="true" aria-labelledby="chapter-title">
+        <header class="modal-head">
+            <div>
+                <h2 id="chapter-title">Add a chapter</h2>
+                <p class="muted small">Each paragraph becomes an addressable block so readers can anchor notes to it. Publishing can be whole-chapter or page by page.</p>
+            </div>
+            <button type="button" class="icon-button" data-modal-close aria-label="Close">✕</button>
+        </header>
+        <form id="chapter-form" novalidate>
+            <div class="modal-body">
+                <div class="form-error mb-4" id="chapter-error" hidden></div>
+                <input type="hidden" id="chapter-book-id" />
+                <div class="form-grid" id="chapter-heading-fields" style="grid-template-columns:1fr 110px">
+                    <div>
+                        <label class="label" for="chapter-name">Chapter title <span class="required">*</span></label>
+                        <input class="field" id="chapter-name" maxlength="255" placeholder="The Tide Comes In" data-autofocus />
+                        <p class="error-text" data-error-for="title" hidden></p>
+                    </div>
+                    <div>
+                        <label class="label" for="chapter-number">Number <span class="required">*</span></label>
+                        <input class="field" id="chapter-number" type="number" min="1" max="999" value="1" />
+                        <p class="error-text" data-error-for="chapterNumber" hidden></p>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <label class="label" for="chapter-content">Chapter text <span class="required">*</span></label>
+                    <textarea class="field" id="chapter-content" rows="11" style="font-family:var(--serif);font-size:.95rem;line-height:1.8"
+                              placeholder="Paste or write the chapter here.&#10;&#10;Leave a blank line between paragraphs — each one becomes an anchor for reader notes."></textarea>
+                    <div class="row" style="justify-content:space-between">
+                        <p class="error-text" data-error-for="content" hidden></p>
+                        <span class="paragraph-count" id="paragraph-count">0 paragraphs</span>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <label class="label" for="chapter-audio">Narration audio URL <span class="muted">(optional)</span></label>
+                    <input class="field" id="chapter-audio" type="url" placeholder="https://cdn.example.com/chapter-1.mp3" />
+                    <p class="hint">The reader always offers synced browser narration; this adds a recorded track as well.</p>
+                </div>
+                <label class="row mt-3" style="font-size:.85rem">
+                    <input type="checkbox" id="chapter-publish" checked style="accent-color:#2e5748" /> Publish immediately
+                </label>
+                <label class="row mt-3" style="font-size:.85rem">
+                    <input type="checkbox" id="chapter-full-book" style="accent-color:#2e5748" />
+                    This is a full book
+                </label>
+                <p class="hint">Use the full-book option to upload an entire manuscript in one go: every line such as “Chapter 3 — The Crossing” starts a new chapter.</p>
+            </div>
+            <footer class="modal-foot"><button type="button" class="btn btn-quiet" data-modal-close>Cancel</button>
+                <button type="submit" class="btn btn-primary" id="chapter-submit">Save chapter</button>
+              
+            </footer>
+        </form>
+    </div>
+</div>
+
+<!-- Stage single page -->
+<div class="modal" id="stage-page-modal" hidden>
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-panel modal-sm" role="dialog" aria-modal="true" aria-labelledby="stage-page-title">
+        <header class="modal-head">
+            <div>
+                <h2 id="stage-page-title">Stage a page</h2>
+                <p class="muted small">Use this when you want to release a chapter page by page instead of all at once.</p>
+            </div>
+            <button type="button" class="icon-button" data-modal-close aria-label="Close">✕</button>
+        </header>
+        <div class="modal-body">
+            <p class="small" id="stage-book"></p>
+            <p class="small" id="stage-chapter"></p>
+            <p class="hint mt-2">The page is staged for editing here. Each page you release is sent to the moderation queue so reviewers can check reader contributions against that exact page.</p>
+        </div>
+        <footer class="modal-foot">
+            <button type="button" class="btn btn-quiet" id="stage-page-cancel">Cancel</button>
+            <button type="button" class="btn btn-primary" id="stage-page-submit">Stage page</button>
+        </footer>
+    </div>
+</div>
+
+<!-- Contributor prompt -->
+<div class="modal" id="contributor-modal" hidden>
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-panel modal-md" role="dialog" aria-modal="true" aria-labelledby="contributor-title">
+        <header class="modal-head">
+            <div>
+                <h2 id="contributor-title">Add as a contributor?</h2>
+                <p class="muted small" id="contributor-sub"></p>
+            </div>
+            <button type="button" class="icon-button" data-modal-close aria-label="Close">✕</button>
+        </header>
+        <div class="modal-body">
+            <p style="font-family:var(--display);font-size:1.2rem" id="contributor-question"></p>
+            <p class="small mt-2" style="color:rgba(75,81,88,.8)" id="contributor-copy"></p>
+        </div>
+        <footer class="modal-foot">    <button type="button" class="btn btn-quiet" data-modal-close>Not now</button>
+            <button type="button" class="btn btn-primary" id="contributor-confirm">Add to credits</button>
+          
+        </footer>
+    </div>
+</div>
+
+<!-- Delete book -->
+<div class="modal" id="delete-modal" hidden>
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-panel modal-sm" role="dialog" aria-modal="true" aria-labelledby="delete-title">
+        <header class="modal-head">
+            <div>
+                <h2 id="delete-title">Delete this book?</h2>
+                <p class="muted small">This removes the book, its chapters, comments and credits. It cannot be undone.</p>
+            </div>
+            <button type="button" class="icon-button" data-modal-close aria-label="Close">✕</button>
+        </header>
+        <div class="modal-body">
+            <p class="small" id="delete-copy"></p>
+        </div>
+        <footer class="modal-foot">
+            <button type="button" class="btn btn-quiet" data-modal-close>Keep book</button>
+            <button type="button" class="btn btn-accent" id="delete-confirm">Delete permanently</button>
+        </footer>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/admin.js" asp-append-version="true"></script>
+}

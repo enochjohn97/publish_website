@@ -1,0 +1,181 @@
+@inject IConfiguration Configuration
+@{
+    // Reader surface only: no dashboard, moderation or editorial markup exists in this file, so
+    // nothing editor-only can reach a public page. An editor's session is treated as a visitor
+    // here so the press never appears signed in on its own reader site.
+    var hasSession = User.Identity?.IsAuthenticated == true;
+    var isSignedIn = hasSession && !User.IsInRole("admin");
+    var displayName = User.Identity?.Name ?? "";
+    var avatar = User.FindFirst("avatar")?.Value;
+    var csrfToken = Csrf.Value;
+    var notice = ViewData["Notice"] as string;
+    var error = ViewData["Error"] as string;
+    var title = ViewData["Title"] as string;
+    var requestedNext = Context.Request.Query["next"].ToString();
+    var signInNext = string.IsNullOrWhiteSpace(requestedNext) || !requestedNext.StartsWith('/') || requestedNext.StartsWith("//", StringComparison.Ordinal) ? "/" : requestedNext;
+    var googleEnabled = !string.IsNullOrWhiteSpace(Configuration["Authentication:Google:ClientId"])
+        && !string.IsNullOrWhiteSpace(Configuration["Authentication:Google:ClientSecret"]);
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Folio is an independent publishing house and bindery. Read serialised manuscripts, annotate the margins and help shape the books we print." />
+    <meta name="csrf-token" content="@(Context.Items["ApiCsrfToken"] as string)" />
+    <title>@(string.IsNullOrEmpty(title) ? "Folio — Publishing & Printing" : $"{title} · Folio")</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/pages.css" asp-append-version="true" />
+    @await RenderSectionAsync("Head", required: false)
+</head>
+<body data-notice="@notice" data-error="@error" data-signed-in="@(isSignedIn ? "true" : "false")">
+    <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+    <header class="site-header@(isSignedIn ? " header-signed-in" : "")">
+        <div class="container header-inner">
+            <a class="brand" href="/" aria-label="Folio home">
+                <span class="brand-mark" aria-hidden="true">✦</span>
+                <span class="brand-text">
+                    <span class="brand-name">Folio</span>
+                    <span class="brand-sub">Press &amp; Bindery</span>
+                </span>
+            </a>
+
+            <nav class="main-nav" aria-label="Primary">
+                <a href="/#catalogue">Catalogue</a>
+            </nav>
+
+            <div class="header-actions">
+                <div class="notification-wrap">
+                        <button type="button" class="bell-button" data-notifications-open aria-label="Notifications" aria-expanded="false" aria-controls="notification-panel">
+                            <span aria-hidden="true">🔔</span>
+                            <span class="bell-count" id="notification-count" hidden>0</span>
+                        </button>
+                        <div class="notification-panel" id="notification-panel" hidden>
+                            <header class="notification-head">
+                                <strong>Notifications</strong>
+                                <button type="button" class="btn btn-quiet btn-xs" id="notification-mark-read">Mark all read</button>
+                            </header>
+                        <div class="notification-list" id="notification-list">
+                            <p class="notification-empty">Loading…</p>
+                        </div>
+                    </div>
+                </div>
+                @if (isSignedIn)
+                {
+                    <button type="button" class="avatar-button" data-profile-open aria-label="Open your profile">
+                        <span class="avatar avatar-sm">
+                            <span class="avatar-initials" aria-hidden="true">@(displayName.Length >= 2 ? displayName[..2].ToUpperInvariant() : displayName)</span>
+                            @if (!string.IsNullOrWhiteSpace(avatar))
+                            {
+                                <img src="@avatar" alt="@displayName" class="avatar-img" referrerpolicy="no-referrer"
+                                     loading="lazy" onerror="this.remove()" />
+                            }
+                        </span>
+                        <span class="avatar-name">@displayName</span>
+                    </button>
+                }
+                @if (!isSignedIn)
+                {
+                    <button type="button" class="btn btn-primary btn-sm" data-signin-open>Sign in</button>
+                }
+            </div>
+        </div>
+    </header>
+
+    <main>
+        @{
+            var flashSuccess = TempData["Success"] as string;
+            var flashWarning = TempData["Warning"] as string;
+            var flashFailure = TempData["Error"] as string;
+        }
+        @if (!string.IsNullOrWhiteSpace(flashSuccess) || !string.IsNullOrWhiteSpace(flashWarning) || !string.IsNullOrWhiteSpace(flashFailure))
+        {
+            <div class="container flash-region" role="status" aria-live="polite">
+                @if (!string.IsNullOrWhiteSpace(flashSuccess))
+                {
+                    <p class="flash flash-success"><span aria-hidden="true">✓</span> @flashSuccess</p>
+                }
+                @if (!string.IsNullOrWhiteSpace(flashWarning))
+                {
+                    <p class="flash flash-warning"><span aria-hidden="true">!</span> @flashWarning</p>
+                }
+                @if (!string.IsNullOrWhiteSpace(flashFailure))
+                {
+                    <p class="flash flash-error"><span aria-hidden="true">✕</span> @flashFailure</p>
+                }
+            </div>
+        }
+        @RenderBody()
+    </main>
+
+    <footer class="site-footer">
+        <div class="container footer-inner">
+            <div>
+                <p class="footer-brand">Folio Press &amp; Bindery</p>
+                <p class="muted small">Manuscripts, marginalia and letterpress. We read together, then we print.</p>
+            </div>
+            <div class="footer-links">
+                <a href="/#catalogue">Catalogue</a>
+                <a href="/?signin=1">Sign in</a>
+                <span class="muted small">© @DateTime.UtcNow.Year Folio Press</span>
+            </div>
+        </div>
+    </footer>
+
+    @if (!isSignedIn)
+    {
+        <div class="modal" id="signin-modal" hidden>
+            <div class="modal-backdrop" data-modal-close></div>
+            <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="signin-title" tabindex="-1">
+                <header class="modal-head">
+                    <div>
+                        <h2 id="signin-title">Sign in to Folio</h2>
+                        <p class="muted small">Readers use their Google account.</p>
+                    </div>
+                    <button type="button" class="icon-button" data-modal-close aria-label="Close">✕</button>
+                </header>
+                <div class="modal-body">
+                    @if (googleEnabled)
+                    {
+                        <a class="google-button" href="/auth/google?returnUrl=@Uri.EscapeDataString(signInNext)">Continue with Google</a>
+                    }
+                    else
+                    {
+                        <p class="form-error" role="alert">Google sign-in is not configured yet.</p>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (isSignedIn)
+    {
+        <div class="modal" id="profile-modal" hidden>
+            <div class="modal-backdrop" data-modal-close></div>
+            <div class="modal-panel modal-lg" role="dialog" aria-modal="true" aria-label="Your reader profile">
+                <header class="modal-head">
+                    <div>
+                        <h2 id="profile-name">Your reader profile</h2>
+                        <p class="muted small" id="profile-sub">Account, badges and reading activity</p>
+                    </div>
+                    <button type="button" class="icon-button" data-modal-close aria-label="Close">✕</button>
+                </header>
+                <div class="modal-body" id="profile-body">
+                    <div class="skeleton skeleton-block"></div>
+                    <div class="skeleton skeleton-block"></div>
+                </div>
+                <footer class="modal-foot">
+                    <form method="post" action="/logout" class="inline-form">
+                        <input type="hidden" name="__RequestVerificationToken" value="@csrfToken" />
+                        <button type="submit" class="btn btn-ghost">Sign out</button>
+                    </form>
+                </footer>
+            </div>
+        </div>
+    }
+
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

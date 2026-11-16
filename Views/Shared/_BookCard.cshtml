@@ -1,0 +1,37 @@
+@model BookRow
+
+<article class="book-card">
+    <a href="/books/@Model.Slug" aria-label="@Model.Title by @Model.AuthorName">
+        <div class="book-card-cover">
+            @if (!string.IsNullOrWhiteSpace(Model.CoverImageUrl))
+            {
+                <img class="book-cover" src="@Model.CoverImageUrl" alt="Cover of @Model.Title" loading="lazy" />
+            }
+            else
+            {
+                <div class="cover-fallback">
+                    <span class="cover-press">Folio Press</span>
+                    <span class="cover-title">@Model.Title</span>
+                    <span class="cover-author">@Model.AuthorName</span>
+                </div>
+            }
+            <span class="cover-status">@(Model.Status == "completed" ? "Completed" : Model.Status == "ongoing" ? "Ongoing" : "Draft")</span>
+        </div>
+    </a>
+    <div class="book-card-body">
+        <p class="book-category">@Model.Category</p>
+        <h3 class="book-title"><a href="/books/@Model.Slug">@Model.Title</a></h3>
+        <p class="book-author">by @Model.AuthorName</p>
+        <p class="book-synopsis">@Model.Synopsis</p>
+        <p class="book-foot">
+            <span>@Model.ChapterCount @(Model.ChapterCount == 1 ? "chapter" : "chapters")</span>
+            <span aria-hidden="true">·</span>
+            <span>@Model.ReadingMinutes min read</span>
+            @if (Model.ContributorCount > 0)
+            {
+                <span aria-hidden="true">·</span>
+                <span>@Model.ContributorCount contributors</span>
+            }
+        </p>
+    </div>
+</article>

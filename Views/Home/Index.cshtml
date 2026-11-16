@@ -1,0 +1,224 @@
+@model HomeViewModel
+@{
+    ViewData["Title"] = "Books finished in the margins";
+    var featured = Model.Books.FirstOrDefault(b => !string.IsNullOrWhiteSpace(b.CoverImageUrl)) ?? Model.Books.FirstOrDefault();
+    var isAdmin = Model.User?.Role == "admin";
+    var signedIn = User.Identity?.IsAuthenticated == true;
+    var readerName = Model.User is not null && !isAdmin ? Model.User.Username : null;
+    var latestNote = Model.RecentNotes.FirstOrDefault();
+}
+
+<section class="hero">
+    <div class="container hero-grid">
+        <div>
+            <p class="eyebrow">@(readerName is not null ? $"Welcome back, {readerName}" : "Independent press · letterpress bindery")</p>
+            <h1 class="hero-title">Books finished in the margins.</h1>
+            <p class="hero-lead">
+                Folio publishes manuscripts in the open. Read a chapter, highlight a line, leave a note — our editors review every
+                contribution, credit the readers who shape the work, and send it to press.
+            </p>
+            <div class="hero-actions">
+                <a href="#catalogue" class="btn btn-primary">Browse the catalogue <span aria-hidden="true">→</span></a>
+                @if (featured is not null)
+                {
+                    <a href="@(featured.FirstChapterNumber is int firstChapter ? $"/books/{featured.Slug}/{firstChapter}" : $"/books/{featured.Slug}")" class="btn btn-ghost">Read “@featured.Title”</a>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-ghost" data-signin-open>Join with Google</button>
+                }
+            </div>
+            @if (latestNote is not null)
+            {
+                <p class="hero-live">
+                    <span class="live-dot" aria-hidden="true"></span>
+                    <span>@EditorialAttribution.For(latestNote) just left a note on <strong>@latestNote.BookTitle</strong></span>
+                </p>
+            }
+            <dl class="stats">
+                <div><dt class="stat-label">Titles</dt><dd class="stat-value">@Model.Stats.Books</dd></div>
+                <div><dt class="stat-label">Chapters</dt><dd class="stat-value">@Model.Stats.Chapters</dd></div>
+                <div><dt class="stat-label">Contributors</dt><dd class="stat-value">@Model.Stats.Contributors</dd></div>
+                <div><dt class="stat-label">Notes published</dt><dd class="stat-value">@Model.Stats.Notes</dd></div>
+            </dl>
+        </div>
+
+        <div>
+            @if (featured is not null)
+            {
+                <div class="hero-art">
+                    <div class="hero-cover">
+                        @if (!string.IsNullOrWhiteSpace(featured.CoverImageUrl))
+                        {
+                            <img class="book-cover" src="@featured.CoverImageUrl" alt="Cover of @featured.Title" />
+                        }
+                        else
+                        {
+                            <div class="cover-fallback">
+                                <span class="cover-press">Folio Press</span>
+                                <span class="cover-title">@featured.Title</span>
+                                <span class="cover-author">@featured.AuthorName</span>
+                            </div>
+                        }
+                    </div>
+                    <div class="hero-note">
+                        <p class="eyebrow">Now reading</p>
+                        <p class="book-title">@featured.Title</p>
+                        <p class="book-author">@featured.AuthorName · @featured.ChapterCount @(featured.ChapterCount == 1 ? "chapter" : "chapters")</p>
+                        <a href="/books/@featured.Slug">Open the book <span aria-hidden="true">→</span></a>
+                    </div>
+                </div>
+            }
+            else
+            {
+                @* <div class="hero-empty">
+                    <p class="eyebrow">The press is warming up</p>
+                    <h2 class="section-title" style="margin-top:0">No titles on the shelf yet</h2>
+                    <p class="small" style="color:rgba(75,81,88,.8)">
+                        Nothing is published yet, so there is nothing to fake. Sign in with Google to read and annotate, or open the
+                        editorial dashboard to publish the first manuscript.
+                    </p>
+                    @if (isAdmin)
+                    {
+                        <a href="/admin" class="btn btn-primary">Open dashboard</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-ghost" data-signin-open>Sign in</button>
+                    }
+                </div> *@
+            }
+        </div>
+    </div>
+</section>
+
+<section class="ticker-band" aria-label="Press activity">
+    <div class="ticker-track">
+        @for (var pass = 0; pass < 2; pass++)
+        {
+            <span class="ticker-item"><span aria-hidden="true">✦</span> @Model.Stats.Books @(Model.Stats.Books == 1 ? "title" : "titles") on the shelf</span>
+            <span class="ticker-item"><span aria-hidden="true">❦</span> @Model.Stats.Chapters @(Model.Stats.Chapters == 1 ? "chapter" : "chapters") serialising in public</span>
+            <span class="ticker-item"><span aria-hidden="true">✎</span> @Model.Stats.Notes reader @(Model.Stats.Notes == 1 ? "note" : "notes") in print</span>
+            <span class="ticker-item"><span aria-hidden="true">✦</span> @Model.Stats.Contributors credited @(Model.Stats.Contributors == 1 ? "contributor" : "contributors")</span>
+            <span class="ticker-item"><span aria-hidden="true">→</span> Every note is read by an editor before it appears</span>
+        }
+    </div>
+</section>
+
+<section id="catalogue" class="section" style="scroll-margin-top:80px; padding-top:0">
+    <div class="container">
+        <div class="section-head">
+            <div>
+                <p class="eyebrow">The catalogue</p>
+                <h2 class="section-title">Every title on our shelf</h2>
+            </div>
+            <p class="section-copy">Live search across titles, authors, genres and synopses results update as you type.</p>
+        </div>
+
+        <div class="search-row">
+            <div class="search-field">
+                <span class="search-icon" aria-hidden="true">⌕</span>
+                <input class="field" id="catalogue-search" type="search" autocomplete="off"
+                       placeholder="Search by title, author, genre or keyword…" aria-label="Search the catalogue" />
+                <span class="search-spinner spinner hidden" id="search-spinner" aria-hidden="true"></span>
+            </div>
+            <div class="search-actions">
+                <button type="button" class="btn btn-ghost" id="filter-toggle" aria-expanded="false" aria-controls="catalogue-filters">
+                    Filters <span id="filter-count"></span>
+                </button>
+                <select class="field" id="sort-select" aria-label="Sort results" style="width:auto">
+                    <option value="newest">Newest first</option>
+                    <option value="title">Title A–Z</option>
+                    <option value="chapters">Most chapters</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="filters" id="catalogue-filters" hidden>
+            <div>
+                <label class="label" for="filter-category">Genre</label>
+                <select class="field" id="filter-category">
+                    <option value="all">All genres</option>
+                    @foreach (var category in Model.Categories)
+                    {
+                        <option value="@category">@category</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="label" for="filter-status">Completion</label>
+                <select class="field" id="filter-status">
+                    <option value="all">All statuses</option>
+                    <option value="ongoing">Ongoing</option>
+                    <option value="completed">Completed</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="result-meta">
+            <span id="result-count">@Model.Books.Count @(Model.Books.Count == 1 ? "title" : "titles")</span>
+            <span id="result-note"></span>
+            <span class="result-error hidden" id="result-error">Search is unavailable right now. Showing the last results.</span>
+        </div>
+
+        <div class="book-grid" id="book-grid">
+            @foreach (var book in Model.Books)
+            {
+                <partial name="_BookCard" model="book" />
+            }
+        </div>
+
+        <div class="empty-state @(Model.Books.Count > 0 ? "hidden" : "")" id="catalogue-empty">
+            <p class="eyebrow">Nothing here yet</p>
+            <h3>@(Model.Books.Count == 0 ? "The shelf is empty — for real" : "No titles match that search")</h3>
+            <p id="catalogue-empty-copy">
+                @(Model.Books.Count == 0
+                    ? "No sample data was loaded. Publish a manuscript from the dashboard and it appears here immediately."
+                    : "Try a different keyword, or clear the genre and status filters to see the full catalogue.")
+            </p>
+        </div>
+    </div>
+</section>
+
+@if (Model.RecentNotes.Count > 0)
+{
+    <section class="section" style="padding-top:12px">
+        <div class="container">
+            <p class="eyebrow">From the margins</p>
+            <h2 class="section-title">Notes our editors published</h2>
+            <div class="quote-grid">
+                @foreach (var note in Model.RecentNotes)
+                {
+                    <figure class="card quote-card">
+                        <span class="quote-mark" aria-hidden="true">“</span>
+                        <blockquote class="quote-text">
+                            @if (!string.IsNullOrWhiteSpace(note.HighlightedText))
+                            {
+                                <span class="quote-snippet">@note.HighlightedText</span>
+                            }
+                            @note.Content
+                        </blockquote>
+                        <figcaption class="quote-user">
+                            @if (!string.IsNullOrWhiteSpace(note.AvatarUrl))
+                            {
+                                <img class="note-avatar" src="@note.AvatarUrl" alt="" referrerpolicy="no-referrer" />
+                            }
+                            else
+                            {
+                                <span class="note-avatar-fallback">@EditorialAttribution.Initials(EditorialAttribution.For(note))</span>
+                            }
+                            <div>
+                                <strong>@EditorialAttribution.For(note)</strong>
+                                <span>@note.BookTitle · @note.CreatedAt.ToString("MMM d, yyyy")</span>
+                            </div>
+                        </figcaption>
+                    </figure>
+                }
+            </div>
+        </div>
+    </section>
+}
+
+@section Scripts {
+    <script src="~/js/catalogue.js" asp-append-version="true"></script>
+}

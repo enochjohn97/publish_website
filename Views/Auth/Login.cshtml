@@ -1,0 +1,61 @@
+@model AdminLoginForm
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Admin sign in";
+    ViewData["IsAdminLogin"] = true;
+}
+
+<div class="login-grid">
+    <div class="login-art">
+        <a href="/" class="login-art-label">←</a>
+        <div>
+            <p class="login-art-label">Folio Press &amp; Bindery</p>
+            <blockquote class="mt-4 login-quote" id="login-quote" aria-live="polite">“A reader lives a thousand lives before he dies.”</blockquote>
+            <p class="login-quote-source" id="login-quote-source">— George R.R. Martin</p>
+            <p class="mt-4">Sign in with your administrator credentials to manage the press.</p>
+        </div>
+        <p class="login-art-label">© @DateTime.UtcNow.Year Folio Press · Restricted access</p>
+    </div>
+
+    <div class="login-body">
+        <div class="login-card">
+            <h1>Admin</h1><br><br>
+            @* <p class="login-sub">This page is for press administrators only.</p> *@
+
+            <form method="post" action="/adminLogin" novalidate>
+                <input type="hidden" name="__RequestVerificationToken" value="@Csrf.Value" />
+
+                @if (!ViewData.ModelState.IsValid && ViewData.ModelState[string.Empty]?.Errors.Count > 0)
+                {
+                    <div class="form-error mb-4" role="alert" data-toast-error="@ViewData.ModelState[string.Empty]!.Errors.First().ErrorMessage">
+                        @ViewData.ModelState[string.Empty]!.Errors.First().ErrorMessage
+                    </div>
+                }
+
+                <div class="form-grid">
+                    <div>
+                        <label class="label" for="Username">Username</label>
+                        <input class="field @(ViewData.ModelState["Username"]?.Errors.Count > 0 ? "input-error" : "")"
+                               id="Username" name="Username" value="@Model.Username" autocomplete="username" required />
+                        @if (ViewData.ModelState["Username"]?.Errors.Count > 0)
+                        {
+                            <p class="error-text">@ViewData.ModelState["Username"]!.Errors.First().ErrorMessage</p>
+                        }
+                    </div>
+                    <div>
+                        <label class="label" for="Password">Password</label>
+                        <input class="field @(ViewData.ModelState["Password"]?.Errors.Count > 0 ? "input-error" : "")"
+                               id="Password" name="Password" type="password" autocomplete="current-password" required />
+                        @if (ViewData.ModelState["Password"]?.Errors.Count > 0)
+                        {
+                            <p class="error-text">@ViewData.ModelState["Password"]!.Errors.First().ErrorMessage</p>
+                        }
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block mt-4">Login</button>
+            </form>
+
+        </div>
+    </div>
+</div>
